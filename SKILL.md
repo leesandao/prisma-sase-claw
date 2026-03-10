@@ -1,5 +1,5 @@
 ---
-name: prisma-sase-api
+name: prisma-sase-claw
 version: "1.0.0"
 description: >
   How to interact with the Palo Alto Networks Prisma SASE API, including Prisma Access,
