@@ -1,0 +1,182 @@
+# Prisma SASE Claw
+
+> Claude Code skill for Palo Alto Networks Prisma SASE API — Prisma Access, SD-WAN & Access Browser.
+>
+> 用于 Palo Alto Networks Prisma SASE API 的 Claude Code 技能 — 支持 Prisma Access、SD-WAN 和 Access Browser。
+
+[![ClawHub](https://img.shields.io/badge/ClawHub-prisma--sase--claw-blue)](https://clawhub.ai/skill/prisma-sase-claw)
+[![License: MIT-0](https://img.shields.io/badge/License-MIT--0-green.svg)](LICENSE)
+
+---
+
+## What is this? / 这是什么？
+
+**Prisma SASE Claw** is a [Claude Code](https://claude.com/claude-code) skill that lets you manage your Palo Alto Networks Prisma SASE platform through natural language. It generates working `curl` commands and Python scripts to interact with the SASE API.
+
+**Prisma SASE Claw** 是一个 [Claude Code](https://claude.com/claude-code) 技能，让你通过自然语言管理 Palo Alto Networks Prisma SASE 平台。它能生成可用的 `curl` 命令和 Python 脚本来调用 SASE API。
+
+### Supported Products / 支持的产品
+
+| Product / 产品 | Description / 描述 |
+|---|---|
+| **Prisma Access** | Security policies, remote networks, GlobalProtect, service connections, decryption rules / 安全策略、远程网络、GlobalProtect、服务连接、解密规则 |
+| **Prisma SD-WAN** | Site configs, routing, path policies, NAT, QoS, performance monitoring / 站点配置、路由、路径策略、NAT、QoS、性能监控 |
+| **Prisma Access Browser** | Browser management, policies, deployments / 浏览器管理、策略、部署 |
+
+---
+
+## Install / 安装
+
+```bash
+npx clawhub@latest install prisma-sase-claw
+```
+
+Or clone from GitHub / 或从 GitHub 克隆：
+
+```bash
+git clone https://github.com/leesandao/prisma-sase-claw.git ~/.claude/skills/prisma-sase-claw
+```
+
+---
+
+## Setup / 配置
+
+### 1. Create a Service Account / 创建服务账户
+
+Create a service account in the [Prisma SASE Console](https://app.prismaaccess.com) and note down:
+
+在 [Prisma SASE 控制台](https://app.prismaaccess.com) 创建服务账户，记录以下信息：
+
+- `Client ID` — e.g. `your_account@12345.iam.panserviceaccount.com`
+- `Client Secret` — shown only once / 仅显示一次
+- `TSG ID` — Tenant Service Group ID / 租户服务组 ID
+
+### 2. Store Credentials / 存储凭据
+
+Credentials are loaded from local `.env` files — **never declared in skill metadata or passed as arguments**.
+
+凭据从本地 `.env` 文件加载 — **不会在技能元数据中声明，也无需作为参数传递**。
+
+```bash
+# Create global config directory / 创建全局配置目录
+mkdir -p ~/.sase
+
+# Copy the template / 复制模板
+cp scripts/.env.example ~/.sase/.env
+
+# Edit with your credentials / 填入你的凭据
+vi ~/.sase/.env
+
+# Lock down permissions / 锁定文件权限（仅所有者可读写）
+chmod 600 ~/.sase/.env
+```
+
+`.env` file format / 文件格式：
+
+```env
+PRISMA_CLIENT_ID=your_service_account@your_tsg.iam.panserviceaccount.com
+PRISMA_CLIENT_SECRET=your_client_secret_here
+PRISMA_TSG_ID=your_tsg_id_here
+```
+
+The auth helper searches credentials in this order / 凭据查找顺序：
+
+1. **Environment variables** / 环境变量 — already exported in shell
+2. **`.env` in current directory** / 当前目录 `.env` — project-level config / 项目级配置
+3. **`~/.sase/.env`** — global config / 全局配置
+
+---
+
+## Usage / 使用
+
+Once installed and configured, just talk to Claude Code in natural language:
+
+安装配置完成后，直接用自然语言与 Claude Code 对话：
+
+```
+> 查看所有安全策略
+> List all security rules in Mobile Users folder
+> 创建一条新的安全规则，阻止访问 qq.com
+> Show me the SD-WAN site configuration
+> 查询过去7天的安全告警
+> Push the candidate config to production
+```
+
+### Python Usage / Python 使用
+
+```python
+from sase_auth import SASEAuth
+
+# Auto-discovers credentials from .env files
+# 自动从 .env 文件发现凭据
+auth = SASEAuth()
+
+# Get a token / 获取令牌
+token = auth.get_token()
+
+# Make API calls / 调用 API
+rules = auth.api_get('/sse/config/v1/security-rules', params={'folder': 'All'})
+
+# Or specify a custom .env path / 或指定自定义 .env 路径
+auth = SASEAuth(env_file="/path/to/custom/.env")
+```
+
+---
+
+## Project Structure / 项目结构
+
+```
+prisma-sase-claw/
+├── SKILL.md                          # Skill definition / 技能定义
+├── README.md                         # This file / 本文件
+├── scripts/
+│   ├── sase_auth.py                  # Auth helper with .env auto-discovery / 认证辅助（自动发现 .env）
+│   └── .env.example                  # Credential template / 凭据模板
+└── references/
+    ├── prisma-access.md              # Prisma Access API reference / API 参考
+    ├── prisma-sdwan.md               # SD-WAN API reference / API 参考
+    ├── prisma-browser.md             # Access Browser API reference / API 参考
+    ├── authentication.md             # Auth & credential guide / 认证与凭据指南
+    └── monitoring.md                 # Aggregate monitoring reference / 聚合监控参考
+```
+
+---
+
+## Security / 安全
+
+- Credentials are stored **locally** in `.env` files with `chmod 600` permissions
+- No secrets are declared in skill metadata or transmitted to ClawHub
+- All API calls go directly to official Palo Alto Networks endpoints (`*.paloaltonetworks.com`)
+- OAuth2 tokens are short-lived (15 minutes) with automatic refresh
+
+---
+
+- 凭据**仅存储在本地** `.env` 文件中，权限为 `chmod 600`
+- 技能元数据中不包含任何密钥，也不会传输到 ClawHub
+- 所有 API 调用直接发送到 Palo Alto Networks 官方端点（`*.paloaltonetworks.com`）
+- OAuth2 令牌有效期短（15 分钟），支持自动刷新
+
+---
+
+## Changelog / 更新日志
+
+### v1.1.1 — Secure Credential Management / 安全凭据管理
+
+- Removed sensitive env vars from skill metadata / 从技能元数据中移除敏感环境变量
+- Added `.env` file auto-discovery mechanism / 新增 `.env` 文件自动发现机制
+- Added `scripts/.env.example` template / 新增凭据模板
+- Updated auth docs / 更新认证文档
+
+### v1.0.0 — Initial Release / 初始发布
+
+- Prisma Access, SD-WAN, Access Browser API support / 支持 Prisma Access、SD-WAN、Access Browser API
+- OAuth2 authentication helper / OAuth2 认证辅助
+- Full endpoint reference documentation / 完整的端点参考文档
+
+---
+
+## License / 许可证
+
+[MIT-0](LICENSE) — Free to use, modify, and redistribute. No attribution required.
+
+自由使用、修改和再分发，无需署名。
