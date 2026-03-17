@@ -1,6 +1,6 @@
 ---
 name: prisma-sase-claw
-version: "1.0.0"
+version: "1.1.1"
 description: >
   How to interact with the Palo Alto Networks Prisma SASE API, including Prisma Access,
   Prisma SD-WAN, and Prisma Access Browser. Use this skill whenever the user wants to
@@ -13,10 +13,6 @@ tags: ["prisma", "sase", "palo-alto", "sd-wan", "network-security", "api", "pris
 metadata:
   openclaw:
     requires:
-      env:
-        - PRISMA_CLIENT_ID
-        - PRISMA_CLIENT_SECRET
-        - PRISMA_TSG_ID
       bins:
         - curl
         - python3
@@ -48,24 +44,44 @@ This skill generates working curl commands and Python scripts to interact with t
 
 ## Authentication
 
-All API calls use OAuth2 client credentials flow. The user needs three values:
-- `client_id` and `client_secret` — from a service account created in the Prisma SASE UI
-- `tsg_id` — the Tenant Service Group ID scoping the token
+All API calls use OAuth2 client credentials flow. Credentials are loaded automatically from local `.env` files — **no sensitive data needs to be passed as arguments or declared in skill metadata**.
 
-### Get an access token
+### Credential Setup
+
+Users store their credentials in a `.env` file (see `scripts/.env.example` for the template). The auth helper searches these locations in order:
+
+1. **Environment variables** — already exported in shell (`PRISMA_CLIENT_ID`, `PRISMA_CLIENT_SECRET`, `PRISMA_TSG_ID`)
+2. **`.env` in current working directory** — project-level config
+3. **`~/.sase/.env`** — global config shared across all projects
+
+### Get an access token (bash)
 
 ```bash
+# Source credentials from .env file first
+set -a; source ~/.sase/.env 2>/dev/null || source .env 2>/dev/null; set +a
+
 curl -s -X POST "https://auth.apps.paloaltonetworks.com/oauth2/access_token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "${CLIENT_ID}:${CLIENT_SECRET}" \
-  -d "grant_type=client_credentials&scope=tsg_id:${TSG_ID}"
+  -u "${PRISMA_CLIENT_ID}:${PRISMA_CLIENT_SECRET}" \
+  -d "grant_type=client_credentials&scope=tsg_id:${PRISMA_TSG_ID}"
 ```
 
 The response returns a JWT access token valid for **15 minutes**. There is no refresh token — request a new one when it expires.
 
 ### Python authentication helper
 
-When generating Python scripts, use the helper at `scripts/sase_auth.py` (relative to this skill directory). Read it for the implementation — it handles token caching and auto-renewal.
+When generating Python scripts, use the helper at `scripts/sase_auth.py` (relative to this skill directory). It automatically discovers credentials from `.env` files — no manual credential passing required:
+
+```python
+from sase_auth import SASEAuth
+auth = SASEAuth()  # auto-discovers credentials from .env files
+token = auth.get_token()
+```
+
+You can also point to a specific `.env` file:
+```python
+auth = SASEAuth(env_file="/path/to/my/.env")
+```
 
 ### Required headers for all API calls
 
@@ -164,7 +180,7 @@ Add `?agg_by=tenant` to aggregate responses across a parent tenant and all child
 
 When generating scripts for the user:
 
-1. **Always parameterize credentials** — never hardcode `client_id`, `client_secret`, or `tsg_id`. Use environment variables or prompt the user.
+1. **Never hardcode credentials** — always use the `.env` file auto-discovery mechanism via `SASEAuth()` or source from `.env` files in shell scripts.
 2. **Handle token expiry** — tokens last 15 minutes. For long-running scripts, implement token refresh logic.
 3. **Include error handling** — check HTTP status codes and print meaningful error messages.
 4. **Use the auth helper** — for Python scripts, reference `scripts/sase_auth.py` for a reusable auth class.
