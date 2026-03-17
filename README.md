@@ -160,6 +160,12 @@ prisma-sase-claw/
 
 ## Changelog / 更新日志
 
+### v1.1.2 — TSG Hierarchy Fix / 租户层级查询修复
+
+- Fixed: `/children` and `/ancestors` sub-endpoints return 404 for most TSG types — documented the correct approach using `GET /tenant_service_groups` with `parent_id` filtering / 修复：`/children` 和 `/ancestors` 子端点对大多数 TSG 类型返回 404 — 改用 `GET /tenant_service_groups` 按 `parent_id` 过滤
+- Added TSG hierarchy querying guide to SKILL.md and authentication.md / 在 SKILL.md 和 authentication.md 中新增 TSG 层级查询指南
+- Added troubleshooting entry for 404 on `/children` endpoint / 新增 `/children` 端点 404 的排错条目
+
 ### v1.1.1 — Secure Credential Management / 安全凭据管理
 
 - Removed sensitive env vars from skill metadata / 从技能元数据中移除敏感环境变量

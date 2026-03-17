@@ -1,6 +1,6 @@
 ---
 name: prisma-sase-claw
-version: "1.1.1"
+version: "1.1.2"
 description: >
   How to interact with the Palo Alto Networks Prisma SASE API, including Prisma Access,
   Prisma SD-WAN, and Prisma Access Browser. Use this skill whenever the user wants to
@@ -194,8 +194,23 @@ TSGs are the organizational hierarchy for multi-tenancy:
 - OAuth tokens are scoped to a specific TSG and its children
 - The root TSG must be created via UI; child TSGs can be created via API
 - Key endpoints:
-  - `GET /tenancy/v1/tenant_service_groups` — list all TSGs
-  - TSG children and ancestors are also queryable
+  - `GET /tenancy/v1/tenant_service_groups` — list all TSGs (includes `parent_id` field)
+  - `GET /tenancy/v1/tenant_service_groups/{tsg_id}` — get a single TSG's details
+
+**Important:** The `/children` and `/ancestors` sub-endpoints (`/tenancy/v1/tenant_service_groups/{id}/children`) return 404 for most tenant types. To reliably list child TSGs, use `GET /tenancy/v1/tenant_service_groups` to fetch all TSGs and filter by `parent_id` in the response:
+
+```bash
+# List all TSGs, then filter children of a specific parent
+curl -s "https://api.sase.paloaltonetworks.com/tenancy/v1/tenant_service_groups" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+parent_id = '${PRISMA_TSG_ID}'
+for tsg in data.get('items', []):
+    if tsg.get('parent_id') == parent_id:
+        print(f\"  {tsg['display_name']} (ID: {tsg['id']})\")"
+```
 
 ## IAM and Roles
 

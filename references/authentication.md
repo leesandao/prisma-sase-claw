@@ -103,6 +103,19 @@ auth = SASEAuth(
 - The token grants access to that TSG and all its child TSGs
 - To access a different part of the tenant hierarchy, request a new token with a different `tsg_id`
 
+## Querying TSG Hierarchy
+
+To list child TSGs under a parent, use `GET /tenancy/v1/tenant_service_groups` and filter by `parent_id`:
+
+```bash
+curl -s "https://api.sase.paloaltonetworks.com/tenancy/v1/tenant_service_groups" \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+Each item in the response includes a `parent_id` field. Filter client-side to find children of a specific TSG.
+
+**Do NOT use** `GET /tenancy/v1/tenant_service_groups/{id}/children` or `/ancestors` — these sub-endpoints return 404 for most tenant types and are unreliable.
+
 ## Troubleshooting Authentication
 
 | Error | Cause | Fix |
@@ -112,6 +125,7 @@ auth = SASEAuth(
 | 401 + "invalid_scope" | TSG ID doesn't exist or not accessible | Verify TSG ID in the UI |
 | 403 Forbidden | Token valid but insufficient permissions | Check service account role assignments |
 | 403 on SD-WAN calls | Profile not initialized | Call `GET /sdwan/v2.1/api/profile` first |
+| 404 on `/children` or `/ancestors` | These sub-endpoints don't work for most TSG types | Use `GET /tenant_service_groups` and filter by `parent_id` instead |
 
 ## Security Best Practices
 
