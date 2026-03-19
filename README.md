@@ -160,6 +160,15 @@ prisma-sase-claw/
 
 ## Changelog / 更新日志
 
+### v1.1.4 — Remote Network Site Creation Guide / Remote Network 站点创建指南
+
+- Added complete Remote Network site creation procedure: IKE Gateway → IPSec Tunnel → Remote Network (must be created in this order) / 新增完整的 Remote Network 站点创建流程：IKE Gateway → IPSec Tunnel → Remote Network（必须按此顺序创建）
+- **Critical fix:** `region` value must come from `GET /locations` API response `region` field (e.g. `asia-east2` for Hong Kong), NOT the `value` field. Using wrong codes causes sites in wrong locations / **关键修复**：`region` 值必须来自 `GET /locations` API 响应的 `region` 字段（如 Hong Kong 对应 `asia-east2`），而非 `value` 字段。使用错误代码会导致站点创建在错误位置
+- Added prerequisite checks: query `/locations`, `/bandwidth-allocations`, `/ike-crypto-profiles`, `/ipsec-crypto-profiles` before creating sites — never guess parameter values / 新增前置检查：创建站点前必须查询可用的 locations、bandwidth、IKE/IPSec profiles — 不要猜测参数值
+- Added common region code reference table / 新增常用 region 代码对照表
+- Documented Service IP allocation behavior: `details` field is populated by cloud after push, new locations may take 10-30 minutes / 记录 Service IP 分配行为：`details` 字段在推送后由云端填充，新 location 可能需要 10-30 分钟
+- Added deletion procedure (reverse order: RN → Tunnel → IKE GW) / 新增删除流程（逆序：RN → Tunnel → IKE GW）
+
 ### v1.1.3 — Config Push Job Monitoring / 配置推送任务监控
 
 - Added Father/Child Job monitoring pattern for config push operations. The push API returns a Father Job (CommitAndPush) that only commits candidate config — the actual cloud push is performed by a Child Job (CommitAll) linked via `parent_id`. Only the Child Job's status reflects the true push result / 新增配置推送的 Father/Child Job 监控模式。推送 API 返回的 Father Job 仅提交候选配置，实际云端推送由通过 `parent_id` 关联的 Child Job 执行。只有 Child Job 的状态才能反映真实的推送结果

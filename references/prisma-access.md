@@ -192,18 +192,124 @@ curl -s -X GET "https://api.sase.paloaltonetworks.com/sse/config/v1/remote-netwo
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
-### Create a remote network
+### Create a Remote Network Site — Full Procedure
+
+Creating a Remote Network site requires creating **three resources in order** (IKE Gateway → IPSec Tunnel → Remote Network), and the `region` value must come from the API — **never guess or hardcode region codes**.
+
+#### Step 1: Query available locations and bandwidth allocations
+
+The `region` and `spn_name` values **must** come from these API queries:
+
 ```bash
-curl -s -X POST "https://api.sase.paloaltonetworks.com/sse/config/v1/remote-networks?folder=All" \
+# Get the correct region code for a location
+curl -s "https://api.sase.paloaltonetworks.com/sse/config/v1/locations?folder=Remote%20Networks" \
+  -H "Authorization: Bearer ${TOKEN}"
+# Response includes: {"value": "hong-kong", "display": "Hong Kong", "region": "asia-east2", ...}
+# Use the "region" field (e.g. "asia-east2") — NOT the "value" field
+
+# Get available SPNs (only locations with allocated bandwidth can have sites)
+curl -s "https://api.sase.paloaltonetworks.com/sse/config/v1/bandwidth-allocations?folder=Remote%20Networks" \
+  -H "Authorization: Bearer ${TOKEN}"
+# Response includes: {"name": "hong-kong", "spn_name_list": ["hong-kong-lily"], "allocated_bandwidth": 50}
+# Use the SPN name from "spn_name_list"
+
+# Get available IKE and IPSec crypto profiles
+curl -s "https://api.sase.paloaltonetworks.com/sse/config/v1/ike-crypto-profiles?folder=Remote%20Networks" \
+  -H "Authorization: Bearer ${TOKEN}"
+curl -s "https://api.sase.paloaltonetworks.com/sse/config/v1/ipsec-crypto-profiles?folder=Remote%20Networks" \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+**Critical:** The `region` value in the Remote Network payload must be the `region` field from the `/locations` response (e.g. `asia-east2` for Hong Kong), NOT the `value` field (e.g. `hong-kong`). Using wrong region codes causes sites to be created in the wrong location (e.g. `ap-southeast-1` is Singapore, not Hong Kong).
+
+#### Step 2: Create IKE Gateway
+
+```bash
+curl -s -X POST "https://api.sase.paloaltonetworks.com/sse/config/v1/ike-gateways?folder=Remote%20Networks" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "branch-office-nyc",
-    "region": "us-east-1",
-    "spn_name": "us-east-nyc",
-    "ipsec_tunnel": "branch-nyc-tunnel",
-    "subnets": ["10.10.0.0/16"]
+    "name": "HK-Site-1-IKE-GW",
+    "local_address": {"interface": "vlan"},
+    "peer_address": {"dynamic": {}},
+    "authentication": {"pre_shared_key": {"key": "YourPSK"}},
+    "protocol_common": {
+      "passive_mode": true,
+      "nat_traversal": {"enable": true},
+      "fragmentation": {"enable": false}
+    },
+    "protocol": {
+      "version": "ikev2",
+      "ikev2": {"ike_crypto_profile": "PaloAlto-Networks-IKE-Crypto", "dpd": {"enable": true}},
+      "ikev1": {"dpd": {"enable": true}}
+    }
   }'
+```
+
+#### Step 3: Create IPSec Tunnel (references the IKE Gateway)
+
+```bash
+curl -s -X POST "https://api.sase.paloaltonetworks.com/sse/config/v1/ipsec-tunnels?folder=Remote%20Networks" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "HK-Site-1-IPSec-Tunnel",
+    "auto_key": {
+      "ike_gateway": [{"name": "HK-Site-1-IKE-GW"}],
+      "ipsec_crypto_profile": "PaloAlto-Networks-IPSec-Crypto"
+    },
+    "tunnel_interface": "tunnel",
+    "anti_replay": true
+  }'
+```
+
+#### Step 4: Create Remote Network (references the IPSec Tunnel)
+
+```bash
+curl -s -X POST "https://api.sase.paloaltonetworks.com/sse/config/v1/remote-networks?folder=Remote%20Networks" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "HK-Site-1",
+    "region": "asia-east2",
+    "spn_name": "hong-kong-lily",
+    "license_type": "FWAAS-AGGREGATE",
+    "ipsec_tunnel": "HK-Site-1-IPSec-Tunnel",
+    "ecmp_load_balancing": "disable",
+    "protocol": {}
+  }'
+```
+
+#### Step 5: Push configuration and monitor (see SKILL.md Father/Child Job pattern)
+
+#### Region code reference (common locations)
+
+| Location | `region` code | Notes |
+|----------|--------------|-------|
+| Hong Kong | `asia-east2` | |
+| Japan Central | `ap-northeast-1` | Also called asia-northeast |
+| Singapore | `ap-southeast-1` | Often confused with Hong Kong |
+| US East | `us-east-1` or `us-east4` | Varies by sub-location |
+
+**Always query `/locations` to get the correct region code. Do not assume or hardcode.**
+
+#### After push: Service IP allocation
+
+After a successful push, the cloud provisions the site. The `details` field in the Remote Network response will be populated with:
+- `service_ip_address` — IKE peer IP for the remote device to connect to
+- `fqdn` — DNS name for the service endpoint
+- `loopback_ip_address` — Loopback IP
+
+For **new locations** (first site in a region), provisioning may take **10-30 minutes** before `details` is populated. Existing locations are typically faster.
+
+#### Deleting Remote Network Sites
+
+Delete in **reverse order**: Remote Network → IPSec Tunnel → IKE Gateway.
+
+```bash
+DELETE /sse/config/v1/remote-networks/{id}?folder=Remote%20Networks
+DELETE /sse/config/v1/ipsec-tunnels/{id}?folder=Remote%20Networks
+DELETE /sse/config/v1/ike-gateways/{id}?folder=Remote%20Networks
 ```
 
 ---
