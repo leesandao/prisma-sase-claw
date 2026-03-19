@@ -322,21 +322,46 @@ POST /sse/config/v1/qos-policy-rules?folder=All
 
 ## Configuration Push
 
-After making changes, push the candidate config to make it active:
+After making changes, push the candidate config to make it active.
+
+**Important:** A push creates a **two-level job chain** (Father Job → Child Job). The Father Job only commits the candidate config; the Child Job performs the actual push to cloud. You must monitor both to confirm success. See SKILL.md "Config Push Job Monitoring: Father/Child Job Pattern" for the full procedure.
+
+### Push candidate configuration
 
 ```bash
-# Push candidate configuration
 curl -s -X POST "https://api.sase.paloaltonetworks.com/sse/config/v1/config-versions/candidate:push" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"folders": ["All"]}'
+  -d '{"folders": ["Remote Networks"]}'
+# Response: {"success": true, "job_id": "1234", "message": "CommitAndPush job enqueued..."}
+```
 
-# Check running configuration
+### Monitor push result (Father + Child Jobs)
+
+```bash
+# Step 1: Wait for Father Job to finish
+curl -s "https://api.sase.paloaltonetworks.com/sse/config/v1/jobs/${FATHER_JOB_ID}" \
+  -H "Authorization: Bearer ${TOKEN}"
+# Wait until status_str == "FIN"
+
+# Step 2: Find Child Job by parent_id
+curl -s "https://api.sase.paloaltonetworks.com/sse/config/v1/jobs?limit=10" \
+  -H "Authorization: Bearer ${TOKEN}"
+# Filter: job["parent_id"] == FATHER_JOB_ID
+
+# Step 3: Poll Child Job every 2 minutes until terminal status
+curl -s "https://api.sase.paloaltonetworks.com/sse/config/v1/jobs/${CHILD_JOB_ID}" \
+  -H "Authorization: Bearer ${TOKEN}"
+# PUSHSUC/FIN+OK = success, PUSHFAIL/FIN+FAIL = failure
+# Parse "details" field (JSON string) for per-region results and errors
+```
+
+### Check running configuration
+
+```bash
 curl -s -X GET "https://api.sase.paloaltonetworks.com/sse/config/v1/config-versions/running" \
   -H "Authorization: Bearer ${TOKEN}"
 ```
-
-The push creates a job. The configuration becomes active once the job completes.
 
 ### Other utility endpoints
 - `tags` — tag management for objects

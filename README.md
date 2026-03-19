@@ -160,6 +160,14 @@ prisma-sase-claw/
 
 ## Changelog / 更新日志
 
+### v1.1.3 — Config Push Job Monitoring / 配置推送任务监控
+
+- Added Father/Child Job monitoring pattern for config push operations. The push API returns a Father Job (CommitAndPush) that only commits candidate config — the actual cloud push is performed by a Child Job (CommitAll) linked via `parent_id`. Only the Child Job's status reflects the true push result / 新增配置推送的 Father/Child Job 监控模式。推送 API 返回的 Father Job 仅提交候选配置，实际云端推送由通过 `parent_id` 关联的 Child Job 执行。只有 Child Job 的状态才能反映真实的推送结果
+- Added job status reference table (`ACT/PEND`, `FIN/OK`, `PUSHFAIL/FAIL`, `PUSHSUC/OK`) / 新增 Job 状态对照表
+- Added per-region push result parsing guide (Child Job `details` field contains JSON with `job_details` array) / 新增按区域解析推送结果指南（Child Job 的 `details` 字段包含带 `job_details` 数组的 JSON）
+- Documented common push failure reasons and remediation steps / 记录常见推送失败原因及修复方法
+- Updated `references/prisma-access.md` Configuration Push section with full monitoring procedure / 更新 `references/prisma-access.md` 配置推送章节，包含完整监控流程
+
 ### v1.1.2 — TSG Hierarchy Fix / 租户层级查询修复
 
 - Fixed: `/children` and `/ancestors` sub-endpoints return 404 for most TSG types — documented the correct approach using `GET /tenant_service_groups` with `parent_id` filtering / 修复：`/children` 和 `/ancestors` 子端点对大多数 TSG 类型返回 404 — 改用 `GET /tenant_service_groups` 按 `parent_id` 过滤

@@ -1,6 +1,6 @@
 ---
 name: prisma-sase-claw
-version: "1.1.2"
+version: "1.1.3"
 description: >
   How to interact with the Palo Alto Networks Prisma SASE API, including Prisma Access,
   Prisma SD-WAN, and Prisma Access Browser. Use this skill whenever the user wants to
@@ -127,10 +127,91 @@ Prisma Access uses a two-stage configuration model. Changes go to a "candidate" 
      -H "Content-Type: application/json" \
      -d '{"folders": ["All"]}'
    ```
-3. **Monitor the push job** until it completes
+3. **Monitor the push job using the Father/Child Job pattern** (see below)
 4. The candidate becomes the running configuration
 
 Always remind the user that config changes won't take effect until pushed.
+
+### Config Push Job Monitoring: Father/Child Job Pattern
+
+**Critical:** A config push creates a **two-level job chain**. The initial response only returns the Father Job ID. You **must** find and monitor the Child Job to determine if the push truly succeeded.
+
+#### Job Chain Structure
+
+```
+Father Job (CommitAndPush, type=53)   ← Returned by push API
+│  Validates and commits candidate config
+│  status=FIN, result=OK does NOT mean push succeeded!
+│
+└── Child Job (CommitAll, type=22)    ← Must be discovered via parent_id
+    Actually pushes config to cloud firewalls
+    This is the REAL result of the push
+```
+
+#### How to find Child Jobs
+
+The API does not return child job IDs directly. After the Father Job completes, query recent jobs and filter by `parent_id`:
+
+```bash
+# 1. Push returns the Father Job ID
+FATHER_JOB_ID=$(curl -s -X POST ".../config-versions/candidate:push" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"folders": ["Remote Networks"]}' | python3 -c "import sys,json; print(json.load(sys.stdin)['job_id'])")
+
+# 2. After Father Job finishes, find Child Jobs
+curl -s "https://api.sase.paloaltonetworks.com/sse/config/v1/jobs?limit=10" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for job in data.get('data', []):
+    if str(job.get('parent_id')) == '${FATHER_JOB_ID}':
+        print(f'Child Job {job[\"id\"]}: {job[\"status_str\"]} / {job[\"result_str\"]}')"
+```
+
+#### Monitoring procedure
+
+1. **Poll Father Job** every 10 seconds until `status_str == "FIN"`
+2. **Wait 10-30 seconds** for Child Job to appear
+3. **Query `GET /jobs?limit=10`** and filter by `parent_id == father_job_id`
+4. **Poll Child Job(s)** every 2 minutes until `status_str` is terminal
+5. **Check Child Job result** to determine true push outcome
+
+#### Job status reference
+
+| `status_str` | `result_str` | Meaning |
+|-------------|-------------|---------|
+| `ACT` | `PEND` | Job is running |
+| `FIN` | `OK` | Job completed successfully |
+| `FIN` | `FAIL` | Job failed (check `details` field) |
+| `PUSHFAIL` | `FAIL` | Push to cloud failed |
+| `PUSHSUC` | `OK` | Push to cloud succeeded |
+
+#### Reading error details from Child Job
+
+The Child Job's `details` field is a JSON string containing per-region results:
+
+```json
+{
+  "Remote-Networks-FW": {
+    "status": "commit failed",
+    "errors": ["error message here"],
+    "result": "FAIL"
+  },
+  "job_details": [
+    {"region": "Japan Central", "service_type": "FW", "commit_status": "Success"},
+    {"region": "Singapore", "service_type": "FW", "commit_status": "Failure", "details": "..."}
+  ]
+}
+```
+
+Always parse the `details` field as JSON and check `job_details` for per-region status when diagnosing push failures.
+
+**Common push failure reasons:**
+- `"Failed to process the onboarding collect of sites"` — Cloud is still processing previous site changes. Wait 10-15 minutes and retry.
+- `"application-tag -> X is not a valid reference"` — Invalid object reference in config. Fix the reference before retrying.
+- `"Certificate X expired"` — An expired certificate is blocking the push. Renew or remove it.
 
 ### SD-WAN: Profile Initialization
 
