@@ -160,6 +160,14 @@ prisma-sase-claw/
 
 ## Changelog / 更新日志
 
+### v1.1.6 — Bandwidth Allocation API / 带宽分配 API
+
+- Added full bandwidth allocation management guide: list, allocate (POST), and delete (DELETE) / 新增完整的带宽分配管理指南：列表、分配 (POST) 和删除 (DELETE)
+- **Critical discovery:** The `DELETE /bandwidth-allocations` endpoint uses a **unique parameter pattern** — requires `name` + `spn_name_list` as query params, does NOT accept `folder` param or request body / **关键发现：** `DELETE /bandwidth-allocations` 端点使用**独特的参数模式** — 需要 `name` + `spn_name_list` 作为查询参数，不接受 `folder` 参数或请求体
+- Documented correct DELETE syntax: `DELETE /bandwidth-allocations?name=hong-kong&spn_name_list=hong-kong-myrtle` / 记录正确的 DELETE 语法
+- Documented POST syntax for new allocations: location `name` must match the `value` field from `GET /locations` / 记录新分配的 POST 语法：location `name` 必须匹配 `GET /locations` 的 `value` 字段
+- Added note that bandwidth changes require config push to take effect / 备注带宽变更需要推送配置才能生效
+
 ### v1.1.5 — Service Status Page Integration / 服务状态页面集成
 
 - Added Prisma SASE Service Status Page monitoring (`https://sase.status.paloaltonetworks.com`) / 新增 Prisma SASE 服务状态页面监控

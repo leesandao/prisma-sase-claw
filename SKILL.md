@@ -1,6 +1,6 @@
 ---
 name: prisma-sase-claw
-version: "1.1.5"
+version: "1.1.6"
 description: >
   How to interact with the Palo Alto Networks Prisma SASE API, including Prisma Access,
   Prisma SD-WAN, and Prisma Access Browser. Use this skill whenever the user wants to

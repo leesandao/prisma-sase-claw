@@ -192,6 +192,45 @@ curl -s -X GET "https://api.sase.paloaltonetworks.com/sse/config/v1/remote-netwo
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
+### Bandwidth Allocation Management
+
+Bandwidth must be allocated to a location before Remote Network sites can be created there.
+
+#### List current allocations
+```bash
+GET /sse/config/v1/bandwidth-allocations?folder=Remote%20Networks
+# Response: {"data": [{"name": "hong-kong", "allocated_bandwidth": 50, "spn_name_list": ["hong-kong-myrtle"]}]}
+```
+
+#### Allocate bandwidth to a new location
+```bash
+POST /sse/config/v1/bandwidth-allocations?folder=Remote%20Networks
+# Body: {"name": "ap-southeast-1", "allocated_bandwidth": 50}
+# The "name" must match a location's "value" field from GET /locations
+# Response includes the auto-assigned SPN: {"spn_name_list": ["ap-southeast-1-rhododendron"]}
+```
+
+#### Delete (deprovision) bandwidth from a location
+
+**Important:** The DELETE endpoint uses a **different parameter pattern** than other config endpoints:
+
+```bash
+# ✅ Correct: use name + spn_name_list as query params, NO folder param
+DELETE /sse/config/v1/bandwidth-allocations?name=hong-kong&spn_name_list=hong-kong-myrtle
+
+# ❌ Wrong: "folder" is not allowed, "spn_name_list" is required
+DELETE /sse/config/v1/bandwidth-allocations?folder=Remote%20Networks&name=hong-kong
+
+# ❌ Wrong: request body is not supported for DELETE
+DELETE /sse/config/v1/bandwidth-allocations -d '{"name":"hong-kong","spn_name_list":["hong-kong-myrtle"]}'
+```
+
+You must provide both `name` (location name) and `spn_name_list` (SPN name) as query parameters. Get these values from `GET /bandwidth-allocations` first.
+
+**Note:** All bandwidth changes require a config push to take effect.
+
+---
+
 ### Create a Remote Network Site — Full Procedure
 
 Creating a Remote Network site requires creating **three resources in order** (IKE Gateway → IPSec Tunnel → Remote Network), and the `region` value must come from the API — **never guess or hardcode region codes**.
