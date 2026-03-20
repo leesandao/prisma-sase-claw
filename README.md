@@ -160,6 +160,14 @@ prisma-sase-claw/
 
 ## Changelog / 更新日志
 
+### v1.1.5 — Service Status Page Integration / 服务状态页面集成
+
+- Added Prisma SASE Service Status Page monitoring (`https://sase.status.paloaltonetworks.com`) / 新增 Prisma SASE 服务状态页面监控
+- **Auto-check on first daily interaction:** Check status page for active incidents or scheduled maintenance before making API calls / **每日首次交互自动检查：** 调用 API 前先检查状态页面是否有活跃事件或计划维护
+- **Auto-check after 2+ consecutive failures:** If Child Jobs fail 2+ times in a row (especially 502 errors), check status page before retrying / **连续 2 次以上失败自动检查：** 如果 Child Job 连续失败 2 次以上（特别是 502 错误），重试前先检查状态页面
+- Added programmatic status check examples: current status, active incidents, upcoming maintenance / 新增编程式状态检查示例：当前状态、活跃事件、计划维护
+- Added 502 Internal Server Error to common push failure reasons / 将 502 内部服务器错误加入常见推送失败原因
+
 ### v1.1.4 — Remote Network Site Creation Guide / Remote Network 站点创建指南
 
 - Added complete Remote Network site creation procedure: IKE Gateway → IPSec Tunnel → Remote Network (must be created in this order) / 新增完整的 Remote Network 站点创建流程：IKE Gateway → IPSec Tunnel → Remote Network（必须按此顺序创建）

@@ -1,6 +1,6 @@
 ---
 name: prisma-sase-claw
-version: "1.1.4"
+version: "1.1.5"
 description: >
   How to interact with the Palo Alto Networks Prisma SASE API, including Prisma Access,
   Prisma SD-WAN, and Prisma Access Browser. Use this skill whenever the user wants to
@@ -212,6 +212,63 @@ Always parse the `details` field as JSON and check `job_details` for per-region 
 - `"Failed to process the onboarding collect of sites"` — Cloud is still processing previous site changes. Wait 10-15 minutes and retry.
 - `"application-tag -> X is not a valid reference"` — Invalid object reference in config. Fix the reference before retrying.
 - `"Certificate X expired"` — An expired certificate is blocking the push. Renew or remove it.
+- `"Internal server error with code 502"` — Cloud infrastructure issue. Check the status page and retry later.
+
+### Prisma SASE Service Status Page
+
+**Status Page URL:** https://sase.status.paloaltonetworks.com
+**Status API:** https://sase.status.paloaltonetworks.com/api
+
+**When to check the status page:**
+
+1. **On first interaction of each day** — Before making any API calls, check the status page for active incidents or scheduled maintenance that may affect operations.
+2. **After 2+ consecutive push failures** — If Child Jobs fail 2 or more times in a row (especially with 502 errors or "In Progress" timeouts), check the status page for service disruptions before retrying.
+3. **On unexpected 5xx errors** — Any repeated 500/502/503 errors from the API should trigger a status page check.
+
+**How to check programmatically:**
+
+```bash
+# Get current SASE service status summary
+curl -s "https://sase.status.paloaltonetworks.com/api/v2/status.json" \
+  | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+status = data.get('status', {})
+print(f'Overall: {status.get(\"description\", \"Unknown\")} ({status.get(\"indicator\", \"?\")})')
+"
+
+# Get active incidents
+curl -s "https://sase.status.paloaltonetworks.com/api/v2/incidents/unresolved.json" \
+  | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+incidents = data.get('incidents', [])
+if not incidents:
+    print('No active incidents')
+else:
+    for inc in incidents:
+        print(f'⚠️  [{inc.get(\"impact\",\"?\")}] {inc.get(\"name\",\"?\")}')
+        print(f'   Status: {inc.get(\"status\",\"?\")} | Updated: {inc.get(\"updated_at\",\"?\")[:19]}')
+        for u in inc.get('incident_updates', [])[:1]:
+            print(f'   Latest: {u.get(\"body\",\"\")[:200]}')
+"
+
+# Get scheduled maintenances
+curl -s "https://sase.status.paloaltonetworks.com/api/v2/scheduled-maintenances/upcoming.json" \
+  | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+maint = data.get('scheduled_maintenances', [])
+if not maint:
+    print('No upcoming maintenance')
+else:
+    for m in maint:
+        print(f'🔧 {m.get(\"name\",\"?\")}')
+        print(f'   Scheduled: {m.get(\"scheduled_for\",\"?\")[:19]} to {m.get(\"scheduled_until\",\"?\")[:19]}')
+"
+```
+
+**Status indicator values:** `none` (operational), `minor`, `major`, `critical`.
 
 ### SD-WAN: Profile Initialization
 
